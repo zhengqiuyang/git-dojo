@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: radial-gradient(1200px 600px at 80% -10%, rgba(139, 92, 246, 0.12), transparent),
+    radial-gradient(900px 500px at 10% 110%, rgba(16, 185, 129, 0.08), transparent),
+    #020617;
+  color: #e2e8f0;
+  font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+/* xterm 铺满容器 */
+.xterm,
+.xterm-viewport,
+.xterm-screen {
+  height: 100% !important;
+}
+
+.xterm .xterm-viewport {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+
+/* 细滚动条 */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}

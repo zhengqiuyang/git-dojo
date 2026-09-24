@@ -1,0 +1,21 @@
+# 依赖与构建产物
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+
+# 环境变量（.env.example 除外）
+.env
+.env.*
+!.env.example
+
+# 本地测试截图证据
+gui-test-screenshots/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+*.log

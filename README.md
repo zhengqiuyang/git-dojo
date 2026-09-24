@@ -1,8 +1,14 @@
 # 🥋 Git 练功房
 
-> 仓库地址：https://github.com/zhengqiuyang/git-dojo （私有，可在 Settings 里改为公开）
+> 仓库地址：https://github.com/zhengqiuyang/git-dojo
+
+![CI](https://github.com/zhengqiuyang/git-dojo/actions/workflows/ci.yml/badge.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![Node](https://img.shields.io/badge/node-18%2B-green)
 
 一个专门面向 **Git 新手** 的闯关式学习平台。在真实的沙盒仓库里敲 `git` 命令闯关，分支图实时可视化，有看得见你仓库的 AI 助教，闯不过去还能看提示、重置重来。
+
+欢迎贡献：新关卡创意、判分优化、文案润色都欢迎，见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## ✨ 核心功能
 

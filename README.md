@@ -16,7 +16,7 @@
 | --- | --- |
 | 🖥️ 沙盒终端 | 内嵌真终端，跑的是**真实的 git**，所有练习都在独立沙盒目录里，弄不坏自己的电脑 |
 | 🌳 分支图可视化 | 每敲一条命令，提交历史 / 分支 / 远程镜像 / HEAD 的拓扑图实时刷新，看得见仓库里发生了什么 |
-| 🎯 闯关课程 | 9 个新手关卡：init+commit → branch → merge → 解决冲突 → rebase → 撤销 → tag → 远程协作 → stash，目标自动判分 |
+| 🎯 闯关课程 | 15 个关卡：基础五关（init→分支→合并→冲突→rebase）+ 进阶五关（撤销→tag→远程→stash→detached HEAD）+ 实战五关（考古→amend→分支清理→push 被拒→综合演练），目标自动判分 |
 | 🤖 AI 助教 | **看得见你的仓库的 AI Agent**：每次对话自动注入关卡进度、提交图、工作区状态、**操作轨迹（命令+输出）**；可一键「复盘我的轨迹」找出走偏的一步；苏格拉底式引导（不直接剧透答案）；支持任何 OpenAI 兼容接口（智谱 GLM / DeepSeek / OpenAI / Ollama） |
 | 📖 场景速查手册 | 按"我遇到了什么问题"组织的速查卡（撤销 / 冲突 / stash / detached HEAD…） |
 
@@ -54,8 +54,14 @@ Windows 下也可以直接**双击 `启动.bat`**。
 | 07 · 标签 | 版本里程碑 | tag / 附注标签 / 历史回溯 |
 | 08 · 远程协作 | 团队节拍 | remote / pull / push / origin/main |
 | 09 · stash | 随身行李 | stash / stash pop / 未完成改动的进退之道 |
+| 10 · detached HEAD | 时光机器 | checkout 历史提交 / 游离头指针 / switch -c 锚定 |
+| 11 · 历史考古 | 事故调查 | log -p / diff / show 定位问题提交 |
+| 12 · 提交打磨 | 橡皮擦 | commit --amend 补文件改信息 |
+| 13 · 分支清理 | 善后 | branch -d / -D，已合并与未合并的差别 |
+| 14 · push 被拒 | 化解冲突 | non-fast-forward / pull 再 push |
+| 15 · 综合演练 | 发布日 | pull→branch→merge→tag→push 全流程串烧 |
 
-第 8 关在沙盒里用**裸仓库模拟 GitHub 远程**，还内置了一个"同事"的克隆仓库往远程推代码，完整体验协作流程。
+第 8 关在沙盒里用**裸仓库模拟 GitHub 远程**，还内置了一个"同事"的克隆仓库往远程推代码，完整体验协作流程。第 11 关是"找出是谁改坏了文件"的侦探剧情；第 15 关把所有招式串成一次真实发布。
 
 ## 🤖 配置 AI 助教（可选）
 
@@ -78,8 +84,10 @@ node scripts/mock-ai-server.mjs &   # 本地 mock（OpenAI 兼容 SSE）
 
 ```bash
 npm run dev &          # 先启动服务
-node scripts/api-test.mjs   # 模拟玩家打通全部 8 关，31 项断言
+node scripts/api-test.mjs   # 模拟玩家打通全部 15 关，54 项断言
 ```
+
+测试包含一条铁律不变量：**每关刚进入时所有目标必须未完成**（杜绝"没做就打勾"）。
 
 ## 🛠️ 技术栈
 
@@ -87,9 +95,9 @@ Next.js 15 (App Router) + React 19 + Tailwind CSS 4 + xterm.js；后端用 Node 
 
 ## 🗺️ 路线图
 
-- 第 10 关 detached HEAD 探险
-- 第 11 关 历史考古（log / show / diff）
-- 第 12 关 综合大演练（模拟真实项目工作流）
-- 第 13 关 团队实战模拟（多人协作工作流）
+- 第 16 关 cherry-pick：摘樱桃（精准摘取某次提交）
+- 第 17 关 bisect：二分捉虫（自动定位引入 bug 的提交）
+- 第 18 关 reflog：时光邮差（找回以为丢失的提交）
+- 第 19 关 worktree：分身术（多分支并行开发）
 - AI 操作轨迹回放式点评（已在 AI 助教中支持）、错题本 + 间隔复习、关卡编辑器 + 社区共创
 - 多人对战 / 排行榜

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSandbox, getHistory, validSessionId } from "@/lib/sandbox";
+import { getSandbox, validSessionId } from "@/lib/sandbox";
+import { getHistory } from "@/lib/history";
 import { buildState } from "@/lib/state";
 import { getLevel } from "@/lib/levels";
 

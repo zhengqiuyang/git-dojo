@@ -14,6 +14,7 @@ import {
   gitStatus,
   tagCommit,
 } from "./git";
+import { getHistory } from "./history";
 import type { Sandbox } from "./sandbox";
 import { LEVEL_META } from "./levelMeta";
 
@@ -181,8 +182,9 @@ export const LEVELS: Level[] = [
     ],
     goals: [
       {
-        label: "当前在 main 分支上完成合并",
+        label: "站在 main 分支上完成了合并",
         check: async (s) => {
+          if (!(await isAncestor(s.dir, "feature", "main"))) return false;
           const r = await runGit(s.dir, ["symbolic-ref", "-q", "--short", "HEAD"]);
           return r.code === 0 && r.stdout.trim() === "main";
         },
@@ -197,7 +199,8 @@ export const LEVELS: Level[] = [
       },
       {
         label: "工作区干净，合并顺利完成",
-        check: cleanTree,
+        check: async (s) =>
+          (await isAncestor(s.dir, "feature", "main")) && (await cleanTree(s)),
       },
     ],
     setup: async (s) => {
@@ -253,11 +256,14 @@ export const LEVELS: Level[] = [
       },
       {
         label: "story.txt 里没有残留的冲突标记",
-        check: (s) => fileHasNoConflictMarkers(s, "story.txt"),
+        check: async (s) =>
+          (await mergeCommitCount(s.dir, "main")) >= 1 &&
+          (await fileHasNoConflictMarkers(s, "story.txt")),
       },
       {
         label: "冲突解决已提交，工作区干净",
-        check: cleanTree,
+        check: async (s) =>
+          (await mergeCommitCount(s.dir, "main")) >= 1 && (await cleanTree(s)),
       },
     ],
     setup: async (s) => {
@@ -582,6 +588,377 @@ export const LEVELS: Level[] = [
       await git(s, ["switch", "-c", "feature"]);
       // 制造未提交的半成品
       await write(s, "story.txt", "第一章：开端。\n第二章：写到一半的剧情(((\n");
+    },
+  },
+  {
+    id: "10",
+    title: "第 10 关 · 头飞了：detached HEAD",
+    subtitle: "checkout 历史提交 / 游离头指针",
+    story:
+      "时间机器启动！你想回到过去看看小镇最早的样子。用 checkout 直接跳到某个历史提交上时，Git 会警告你「detached HEAD」——头飞了。" +
+      "别慌，这一关教你安全地观光历史，还能顺手把过去锚定成一个新分支。",
+    steps: [
+      "git log --oneline — 找到最早的提交哈希（最下面那行）",
+      "git checkout <最早的提交哈希> — 时光倒流（注意 detached HEAD 提示）",
+      "ls 或 cat story.txt — 看看旧时光里的文件长什么样",
+      "git switch -c time-travel — 把这个历史时刻锚定成新分支",
+      "git switch main — 平安回到现在",
+      "git log --oneline --all — 注意 time-travel 停在过去，main 继续向前",
+    ],
+    hints: [
+      "detached HEAD = 你站在一个提交上，而不是某个分支上。此时产生的提交不属于任何分支，切走就可能丢。",
+      "想把过去留住？像本关这样：git switch -c 新分支名，从当前所在的位置长出一条新分支。",
+      "git switch - 可以瞬间回到你上一次所在的分支，很省心。",
+    ],
+    goals: [
+      {
+        label: "成功把历史时刻锚定为 time-travel 分支（指向 main 的祖先提交）",
+        check: async (s) => {
+          if (!(await branchExists(s.dir, "time-travel"))) return false;
+          const tt = await revParse(s.dir, "time-travel");
+          const main = await revParse(s.dir, "main");
+          if (!tt || !main || tt === main) return false;
+          return isAncestor(s.dir, "time-travel", "main");
+        },
+      },
+      {
+        label: "观光结束，HEAD 回到 main（不再分离）",
+        check: async (s) => {
+          if (!(await branchExists(s.dir, "time-travel"))) return false;
+          const r = await runGit(s.dir, ["symbolic-ref", "-q", "--short", "HEAD"]);
+          return r.code === 0 && r.stdout.trim() === "main";
+        },
+      },
+      {
+        label: "主线历史完好无损（main 上仍是原来的 3 个提交）",
+        check: async (s) => {
+          if (!(await branchExists(s.dir, "time-travel"))) return false;
+          return (await revListCount(s.dir, "main")) === 3;
+        },
+      },
+    ],
+    setup: async (s) => {
+      await write(s, "story.txt", "第一章：小镇的诞生。\n");
+      await git(s, ["init"]);
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "第一章：小镇的诞生"]);
+      await write(s, "story.txt", "第一章：小镇的诞生。\n第二章：第一栋房子。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "第二章：第一栋房子"]);
+      await write(s, "story.txt", "第一章：小镇的诞生。\n第二章：第一栋房子。\n第三章：第一位居民。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "第三章：第一位居民"]);
+    },
+  },
+  {
+    id: "11",
+    title: "第 11 关 · 历史考古",
+    subtitle: "log -p / diff / show 定位问题",
+    story:
+      "事故调查：小镇之歌 poem.txt 的第一句被人改出了错别字，但没人承认是哪次提交干的。" +
+      "拿起考古工具（git log -p / git diff / git show），找出「真凶提交」，修好它，并留下修复记录。",
+    steps: [
+      "git log --oneline — 纵览全部提交",
+      "git log -p poem.txt — 逐条查看这个文件的每一处变迁（考古核心技能！）",
+      "定位改坏第一句的那次提交（也可以用 git diff HEAD~2 HEAD~1 对比某两步）",
+      "把 poem.txt 的第一句改回「小镇的夜晚星光闪耀。」（保留后两句，可用文件编辑器或 echo 覆盖）",
+      'git add poem.txt && git commit -m "修复歌词错别字"',
+    ],
+    hints: [
+      "git log -p 文件名 是考古利器：按提交顺序展示这个文件的每一处改动，谁的锅一目了然。",
+      "只想对比相邻两次提交？git diff HEAD~2 HEAD~1 会显示这两个快照之间的差异。",
+      "git show 提交哈希 可以查看任意一次提交的完整改动详情。",
+    ],
+    goals: [
+      {
+        label: "至少做过一次考古对比（git log -p / git diff / git show）",
+        check: async (s) =>
+          getHistory(s.sessionId).some((h) => /^git (diff|log -p|show)\b/.test(h.cmd)),
+      },
+      {
+        label: "错别字已修复：第一句恢复为「小镇的夜晚星光闪耀。」",
+        check: async (s) => {
+          try {
+            const content = await fs.readFile(path.join(s.dir, "poem.txt"), "utf8");
+            return content.includes("小镇的夜晚星光闪耀。") && !content.includes("小珍");
+          } catch {
+            return false;
+          }
+        },
+      },
+      {
+        label: "修复已提交：历史变成 5 个提交，工作区干净",
+        check: async (s) => (await revListCount(s.dir, "HEAD")) === 5 && (await cleanTree(s)),
+      },
+    ],
+    setup: async (s) => {
+      await write(s, "poem.txt", "小镇的夜晚星光闪耀。\n");
+      await git(s, ["init"]);
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "创作小镇之歌"]);
+      await write(s, "poem.txt", "小镇的夜晚星光闪耀。\n湖面倒映着灯火。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "补上第二句"]);
+      // 伪装成正常提交的"破坏"
+      await write(s, "poem.txt", "小珍的夜晚星光闪耀。\n湖面倒映着灯火。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "统一用词"]);
+      await write(s, "poem.txt", "小珍的夜晚星光闪耀。\n湖面倒映着灯火。\n孩子们唱着歌回家。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "添加结尾"]);
+    },
+  },
+  {
+    id: "12",
+    title: "第 12 关 · 提交打磨：amend",
+    subtitle: "commit --amend / 补救最后一次提交",
+    story:
+      "刚才那次提交手滑了：说明书文件忘了加进去，提交信息也写错了。" +
+      "好消息：还没 push 出门，一切都来得及。amend 就是「重写最后一次提交」的橡皮擦。",
+    steps: [
+      "git status — 发现 feature.md 还躺在工作区没被提交",
+      "git add feature.md",
+      "git commit --amend --no-edit — 把它悄悄塞进上一次提交（不产生新提交）",
+      "git log --oneline — 确认还是 2 个提交，没有多出来",
+      'git commit --amend -m "添加功能说明书" — 顺手把提交信息也改对',
+    ],
+    hints: [
+      "amend = 丢掉上一次提交，用一个全新的提交替代它（内容 + 信息都能改）。只对「最后一次提交」生效。",
+      "--no-edit 表示沿用原提交信息；想改信息就写 -m。两个动作可以合并成一步：git commit --amend -m \"新信息\"。",
+      "和 L6 一样：已 push 的提交不要 amend，历史会分叉。没出门的提交随便改。",
+    ],
+    goals: [
+      {
+        label: "feature.md 已补进仓库，且没有多出新提交（历史仍是 2 个提交）",
+        check: async (s) =>
+          (await listTrackedFiles(s.dir)).includes("feature.md") &&
+          (await revListCount(s.dir, "HEAD")) === 2,
+      },
+      {
+        label: "提交信息已改为包含「说明书」",
+        check: async (s) => {
+          if ((await revListCount(s.dir, "HEAD")) !== 2) return false;
+          const r = await runGit(s.dir, ["log", "-1", "--format=%s"]);
+          return r.code === 0 && r.stdout.trim().includes("说明书");
+        },
+      },
+      {
+        label: "工作区干干净净",
+        check: cleanTree,
+      },
+    ],
+    setup: async (s) => {
+      await write(s, "app.txt", "小镇应用 v1。\n");
+      await git(s, ["init"]);
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "初始版本"]);
+      await write(s, "docs.txt", "功能简介。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "添加功能说明"]);
+      // 故意漏提交的文件
+      await write(s, "feature.md", "# 功能说明书\n\n1. 天气系统\n2. 留言板\n");
+    },
+  },
+  {
+    id: "13",
+    title: "第 13 关 · 分支清理",
+    subtitle: "branch -d / -D / 保鲜的仓库",
+    story:
+      "上一版的合并工作完成了，仓库里却躺着几条用完的旧分支——像散落一地的工具。" +
+      "这一关学习分支的「善后」：已合并的温柔删（-d），没合并的要三思（Git 会拦你，-D 才能强删）。",
+    steps: [
+      "git switch main",
+      "git merge feature — 先把 feature 的成果收进 main",
+      "git branch -d feature — 已合并的分支可以安全删除（内容都在 main 里）",
+      "git branch -d experiment — 试试删未合并的分支，看 Git 怎么拦你",
+      "确认 experiment 的实验真的不要了 → git branch -D experiment 强制删除",
+      "git branch — 最后清点一下仓库里的分支",
+    ],
+    hints: [
+      "-d 是安全删除：只删「已经合并」的分支，防手滑。Git 拦住你时，先想清楚那条分支上有没有没合并的宝贝。",
+      "-D 是强制删除，删掉的分支指针就没了（提交对象还会活一阵子，但很难找）。强删前深呼吸一次。",
+      "合并后删分支不会丢提交——分支只是个指向提交的路标，路标撤了，路（提交）还在 main 的历史里。",
+    ],
+    goals: [
+      {
+        label: "feature 的成果已并入 main，且该分支已被清理",
+        check: async (s) =>
+          (await hasCommitWithSubject(s.dir, "main", "feature：新剧情")) &&
+          !(await branchExists(s.dir, "feature")),
+      },
+      {
+        label: "未合并的 experiment 分支也已处理（删除）",
+        check: async (s) => !(await branchExists(s.dir, "experiment")),
+      },
+      {
+        label: "main 上保留了合并记录（出现合并提交）",
+        check: async (s) => (await mergeCommitCount(s.dir, "main")) >= 1,
+      },
+    ],
+    setup: async (s) => {
+      await write(s, "story.txt", "第一章。\n");
+      await git(s, ["init"]);
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "第一章"]);
+
+      await git(s, ["switch", "-c", "feature"]);
+      await write(s, "feature.txt", "feature 分支的成果。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "feature：新剧情"]);
+
+      await git(s, ["switch", "main"]);
+      await write(s, "notes.txt", "主线的推进。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "主线推进"]);
+
+      await git(s, ["switch", "-c", "experiment"]);
+      await write(s, "实验草稿.txt", "大胆但未完成的实验。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "大胆实验（未完成）"]);
+
+      await git(s, ["switch", "main"]);
+    },
+  },
+  {
+    id: "14",
+    title: "第 14 关 · 被拒绝的 push",
+    subtitle: "non-fast-forward / pull 再 push",
+    story:
+      "你在飞机上离线写完了一个提交，落地后兴冲冲 git push——被拒绝了！" +
+      "远程在你不知情的时候多了同事的紧急修复。这就是传说中的 non-fast-forward：学会礼貌地化解它。",
+    steps: [
+      "git push — 看看被拒绝时的报错（重点读 non-fast-forward 那段）",
+      "git pull — 把远程上同事的提交接下来（会自动生成一个合并提交）",
+      "git log --oneline --graph — 确认两边的历史都完整保留",
+      "git push — 这次顺利推上去",
+    ],
+    hints: [
+      "被拒绝不是坏事：Git 在保护远程，防止你不知不觉覆盖别人的成果。",
+      "化解套路固定：先 pull（把远程新历史接进来）→ 有冲突就解决 → 再 push。永远不要用 -f 强推来绕过它。",
+      "git pull 会用合并提交把两条线缝起来；如果更喜欢线性历史，可以 git pull --rebase（变基你的本地提交）。",
+    ],
+    goals: [
+      {
+        label: "本地与远程重新完全一致（main 与 origin/main 指向同一提交）",
+        check: async (s) => {
+          const local = await revParse(s.dir, "main");
+          const remote = await revParse(s.dir, "refs/remotes/origin/main");
+          return local !== null && local === remote;
+        },
+      },
+      {
+        label: "双方成果都在：同事的紧急修复和你的本地提交都进了 main",
+        check: async (s) =>
+          (await hasCommitWithSubject(s.dir, "main", "同事：紧急修复")) &&
+          (await hasCommitWithSubject(s.dir, "main", "我的本地提交")),
+      },
+      {
+        label: "同步完成后工作区干净",
+        check: async (s) => {
+          const local = await revParse(s.dir, "main");
+          const remote = await revParse(s.dir, "refs/remotes/origin/main");
+          if (local === null || local !== remote) return false;
+          return cleanTree(s);
+        },
+      },
+    ],
+    setup: async (s) => {
+      const parent = path.dirname(s.dir);
+      const bare = path.join(parent, `level-${s.levelId}-remote.git`);
+      const colleague = path.join(parent, `level-${s.levelId}-colleague`);
+
+      await git(s, ["init"]);
+      await write(s, "README.md", "# 小镇项目 · 协作演习\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "项目初始化"]);
+      await git(s, ["init", "--bare", bare]);
+      await git(s, ["remote", "add", "origin", bare]);
+      await git(s, ["push", "-u", "origin", "main"]);
+
+      // 同事抢先推了一个提交
+      await git(s, ["clone", bare, colleague]);
+      await fs.writeFile(path.join(colleague, "urgent.txt"), "紧急修复：大门漏风。\n", "utf8");
+      await gitIn(colleague, ["add", "."]);
+      await gitIn(colleague, ["commit", "-m", "同事：紧急修复"]);
+      await gitIn(colleague, ["push", "origin", "main"]);
+
+      // 你在"飞机上"离线写了一个提交（本地领先 1，远程也领先 1 → 分叉）
+      await write(s, "local.txt", "飞机上写的本地成果。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "我的本地提交"]);
+    },
+  },
+  {
+    id: "15",
+    title: "第 15 关 · 综合大演练：v2.0 发布日",
+    subtitle: "pull / branch / merge / tag / push 全流程",
+    story:
+      "毕业考试！今天是小镇 v2.0 的发布日。你需要像真正的团队开发者一样完成一整套日常操作：" +
+      "同步远程 → 开分支开发两个功能 → 合并回主线 → 打上版本标签 → 发布。所有学过的招式都用上了。",
+    steps: [
+      "git pull — 先同步远程上同事的新提交",
+      "git switch -c feature — 为 v2.0 开一个功能分支",
+      'echo 留言板 > feat1.txt && git add . && git commit -m "功能一：留言板"',
+      'echo 暗黑模式 > feat2.txt && git add . && git commit -m "功能二：暗黑模式"',
+      "git switch main && git merge feature",
+      "git push — 先把主分支推上远程",
+      'git tag v2.0 -m "小镇 v2.0 正式发布"',
+      "git push --tags — 标签默认不随 push 走，要单独推！",
+    ],
+    hints: [
+      "这一关没有新知识，是把 pull / branch / merge / tag / push 串成肌肉记忆。迷路就回到「建议路径」。",
+      "git push 默认不推标签！git push --tags 一次推全部，或者 git push origin v2.0 只推一个。但也别忘了先推分支本身。",
+      "发布前用 git log --oneline --graph 确认：同事的提交、你的两个功能、合并提交，一个都不能少。",
+    ],
+    goals: [
+      {
+        label: "远程上同事的提交已同步进本地 main",
+        check: (s) => hasCommitWithSubject(s.dir, "main", "同事：更新导航栏"),
+      },
+      {
+        label: "两个功能提交都已进入 main",
+        check: async (s) =>
+          (await hasCommitWithSubject(s.dir, "main", "功能一：留言板")) &&
+          (await hasCommitWithSubject(s.dir, "main", "功能二：暗黑模式")),
+      },
+      {
+        label: "v2.0 标签盖在合并后的最新提交上",
+        check: async (s) => {
+          const t = await tagCommit(s.dir, "v2.0");
+          const h = await revParse(s.dir, "main");
+          return t !== null && t === h;
+        },
+      },
+      {
+        label: "发布完成：远程 main 与标签 v2.0 都已更新",
+        check: async (s) => {
+          const local = await revParse(s.dir, "main");
+          const remote = await revParse(s.dir, "refs/remotes/origin/main");
+          if (local === null || local !== remote) return false;
+          const r = await runGit(s.dir, ["ls-remote", "--tags", "origin"]);
+          return r.code === 0 && r.stdout.includes("refs/tags/v2.0");
+        },
+      },
+    ],
+    setup: async (s) => {
+      const parent = path.dirname(s.dir);
+      const bare = path.join(parent, `level-${s.levelId}-remote.git`);
+      const colleague = path.join(parent, `level-${s.levelId}-colleague`);
+
+      await git(s, ["init"]);
+      await write(s, "app.txt", "小镇应用 v1。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "初始版本"]);
+      await git(s, ["init", "--bare", bare]);
+      await git(s, ["remote", "add", "origin", bare]);
+      await git(s, ["push", "-u", "origin", "main"]);
+
+      // 同事往远程推了 v2.0 依赖的准备工作
+      await git(s, ["clone", bare, colleague]);
+      await fs.writeFile(path.join(colleague, "nav.txt"), "导航栏升级方案。\n", "utf8");
+      await gitIn(colleague, ["add", "."]);
+      await gitIn(colleague, ["commit", "-m", "同事：更新导航栏"]);
+      await gitIn(colleague, ["push", "origin", "main"]);
     },
   },
 ];

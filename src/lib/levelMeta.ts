@@ -9,12 +9,18 @@ export const LEVEL_META = [
   { id: "07", title: "第 7 关 · 标签与版本", short: "标签" },
   { id: "08", title: "第 8 关 · 连接远程仓库", short: "远程协作" },
   { id: "09", title: "第 9 关 · 随身行李：stash", short: "stash" },
+  { id: "10", title: "第 10 关 · 头飞了：detached HEAD", short: "detached HEAD" },
+  { id: "11", title: "第 11 关 · 历史考古", short: "考古" },
+  { id: "12", title: "第 12 关 · 提交打磨：amend", short: "amend" },
+  { id: "13", title: "第 13 关 · 分支清理", short: "分支清理" },
+  { id: "14", title: "第 14 关 · 被拒绝的 push", short: "push 被拒" },
+  { id: "15", title: "第 15 关 · 综合大演练：v2.0 发布日", short: "综合演练" },
 ];
 
 /** 后续路线图（仅展示，未开放） */
 export const ROADMAP = [
-  { title: "第 10 关 · 头飞了", subtitle: "detached HEAD 探险" },
-  { title: "第 11 关 · 历史考古", subtitle: "log / show / diff 深度考古" },
-  { title: "第 12 关 · 综合大演练", subtitle: "模拟真实项目工作流" },
-  { title: "第 13 关 · 团队实战模拟", subtitle: "多人协作工作流" },
+  { title: "第 16 关 · 摘樱桃", subtitle: "cherry-pick：精准摘取某次提交" },
+  { title: "第 17 关 · 二分捉虫", subtitle: "bisect：自动定位引入 bug 的提交" },
+  { title: "第 18 关 · 时光邮差", subtitle: "reflog：找回以为丢失的提交" },
+  { title: "第 19 关 · 分身术", subtitle: "worktree：多分支并行开发" },
 ];

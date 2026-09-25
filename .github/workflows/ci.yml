@@ -29,7 +29,7 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: 1
 
-      - name: 启动服务并跑 9 关闯关测试
+      - name: 启动服务并跑 19 关闯关测试
         run: |
           npm run start &
           for i in $(seq 1 60); do

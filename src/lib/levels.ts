@@ -993,9 +993,11 @@ export const LEVELS: Level[] = [
         },
       },
       {
-        label: "main 上只多出这 1 个提交（没有产生合并），工作区干净",
+        label: "只摘了一颗樱桃（没有产生合并提交），工作区干净",
         check: async (s) =>
-          (await revListCount(s.dir, "feature..main")) === 1 && (await cleanTree(s)),
+          (await lsTree(s.dir, "main")).includes("fix.txt") &&
+          (await mergeCommitCount(s.dir, "main")) === 0 &&
+          (await cleanTree(s)),
       },
     ],
     setup: async (s) => {

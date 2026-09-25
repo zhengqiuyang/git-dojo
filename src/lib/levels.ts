@@ -961,6 +961,243 @@ export const LEVELS: Level[] = [
       await gitIn(colleague, ["push", "origin", "main"]);
     },
   },
+  {
+    id: "16",
+    title: "第 16 关 · 摘樱桃：cherry-pick",
+    subtitle: "只摘需要的那个提交",
+    story:
+      "feature 分支上有一堆提交：一次宝贵的重要修复，混着一些乱七八糟的实验。" +
+      "全合并进来？不行，实验还没好。这时候就该请出 cherry-pick——像摘樱桃一样，只摘下你要的那一颗。",
+    steps: [
+      "git log --oneline feature — 看看 feature 上都有什么",
+      "git switch main — 摘到的樱桃要放在 main 上",
+      "git cherry-pick <重要修复的提交哈希> — 只摘这一个提交",
+      "git log --oneline --graph — 注意：摘过来的是内容相同、哈希不同的新提交",
+      "git status — 确认实验性的乱改没有混进来",
+    ],
+    hints: [
+      "cherry-pick 的对象是「提交」而不是文件——它会把那次提交的完整改动复制到当前分支。",
+      "找哈希用 git log --oneline feature，摘樱桃时人在哪个分支，樱桃就落在哪个分支。",
+      "摘完不会删掉 feature 上的原提交（只是复制）。原分支等实验做完再另行处理。",
+    ],
+    goals: [
+      {
+        label: "重要修复已摘到 main（fix.txt 出现在 main 的文件树里）",
+        check: async (s) => (await lsTree(s.dir, "main")).includes("fix.txt"),
+      },
+      {
+        label: "实验性的乱改没有混进来（weird.txt 不在 main 上）",
+        check: async (s) => {
+          const tree = await lsTree(s.dir, "main");
+          return tree.includes("fix.txt") && !tree.includes("weird.txt");
+        },
+      },
+      {
+        label: "main 上只多出这 1 个提交（没有产生合并），工作区干净",
+        check: async (s) =>
+          (await revListCount(s.dir, "feature..main")) === 1 && (await cleanTree(s)),
+      },
+    ],
+    setup: async (s) => {
+      await write(s, "story.txt", "第一章。\n");
+      await git(s, ["init"]);
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "第一章"]);
+      await write(s, "notes.txt", "主线笔记。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "主线笔记"]);
+
+      await git(s, ["switch", "-c", "feature"]);
+      await write(s, "fix.txt", "关键修复：大门漏风补好了。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "feature：重要修复"]);
+      await write(s, "weird.txt", "乱七八糟的实验中间产物。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "feature：实验性乱改"]);
+
+      await git(s, ["switch", "main"]);
+    },
+  },
+  {
+    id: "17",
+    title: "第 17 关 · 二分捉虫：bisect",
+    subtitle: "自动定位引入 bug 的提交",
+    story:
+      "计算器突然出 BUG 了！八次提交里藏着一次手滑，逐个翻太慢。" +
+      "git bisect 会自动二分搜索：你只需要告诉它每个中间版本是「好」还是「坏」，几步就能锁定真凶。",
+    steps: [
+      "git log --oneline — 记下最早提交的哈希",
+      "git bisect start — 开始捉虫",
+      "git bisect bad HEAD — 标记当前版本是坏的",
+      "git bisect good <最早提交哈希> — 标记最早版本是好的，Git 自动跳到中间某次提交",
+      "cat calc.txt — 测试当前版本：看到 BUG 标记就 git bisect bad，没有就 git bisect good",
+      "重复几步，Git 会宣布「X is the first bad commit」",
+      "git bisect reset — 结束捉虫，回到 main",
+      "修好 calc.txt（删掉 BUG 行，可用文件编辑器），git add + git commit",
+    ],
+    hints: [
+      "bisect 的原理是二分法：8 次提交只要 3 步左右就能锁定。你只负责「验货」，其余全自动。",
+      "每一步只做一件事：看 calc.txt 有没有 BUG 行，然后 bad 或 good。不确定时再看一眼。",
+      "捉虫结束后一定要 git bisect reset，否则你会一直停在分离 HEAD 状态。",
+    ],
+    goals: [
+      {
+        label: "BUG 已修复：calc.txt 里不再有 BUG 行",
+        check: async (s) => {
+          try {
+            const content = await fs.readFile(path.join(s.dir, "calc.txt"), "utf8");
+            return !content.includes("BUG");
+          } catch {
+            return false;
+          }
+        },
+      },
+      {
+        label: "修复已提交且收工：回到 main、历史 9 个提交、没有残留捉虫会话",
+        check: async (s) => {
+          const r = await runGit(s.dir, ["symbolic-ref", "-q", "--short", "HEAD"]);
+          if (r.code !== 0 || r.stdout.trim() !== "main") return false;
+          if ((await revListCount(s.dir, "HEAD")) !== 9) return false;
+          try {
+            await fs.stat(path.join(s.dir, ".git", "BISECT_LOG"));
+            return false; // 还有残留的 bisect 会话
+          } catch {
+            return true;
+          }
+        },
+      },
+      {
+        label: "你是真的用 bisect 捉的虫（历史命令里有 git bisect）",
+        check: async (s) => getHistory(s.sessionId).some((h) => /^git bisect\b/.test(h.cmd)),
+      },
+    ],
+    setup: async (s) => {
+      const lines: string[] = [];
+      await git(s, ["init"]);
+      for (let i = 1; i <= 8; i++) {
+        lines.push(`第${i}步计算完成。`);
+        if (i === 6) lines.push("BUG: 除零错误！");
+        await write(s, "calc.txt", lines.join("\n") + "\n");
+        await git(s, ["add", "."]);
+        await git(s, ["commit", "-m", `提交 ${i}`]);
+      }
+    },
+  },
+  {
+    id: "18",
+    title: "第 18 关 · 时光邮差：reflog",
+    subtitle: "找回以为永远丢失的提交",
+    story:
+      "惨案！一次手滑的 git reset --hard 把「重要成果」从历史上抹掉了，git log 里怎么也找不到。" +
+      "别急——只要提交过，它就在 reflog 的漂流瓶里。这封「时光邮差」的信，现在去取回来。",
+    steps: [
+      "git log --oneline — 确认：重要成果真的不见了",
+      "git reflog — 翻看 HEAD 的每一次移动记录（每条前面是哈希）",
+      '找到写着「重要成果：藏宝图」的那条，抄下它的哈希',
+      "git reset --hard <那个哈希> — 让 main 重新指向它",
+      "git log --oneline — 藏宝图回来了！",
+    ],
+    hints: [
+      "reflog 记录的是「HEAD 走过的每一步」，reset、checkout、commit 全都逃不过它的眼睛——这是 Git 的后悔药底线。",
+      "reflog 里的记录默认保留 90 天，所以「丢了」的提交基本都能捞回来。",
+      "找回的方式不止 reset --hard 一种：git branch rescued <哈希> 再合并，更温和。",
+    ],
+    goals: [
+      {
+        label: "丢失的提交找回来了（treasure.txt 重新出现在 main）",
+        check: async (s) => (await lsTree(s.dir, "main")).includes("treasure.txt"),
+      },
+      {
+        label: "你是真的用了时光邮差（历史命令里有 git reflog）",
+        check: async (s) => getHistory(s.sessionId).some((h) => /^git reflog\b/.test(h.cmd)),
+      },
+      {
+        label: "main 历史恢复完整：3 个提交都在，工作区干净",
+        check: async (s) => (await revListCount(s.dir, "HEAD")) === 3 && (await cleanTree(s)),
+      },
+    ],
+    setup: async (s) => {
+      await write(s, "story.txt", "冒险开始。\n");
+      await git(s, ["init"]);
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "初始版本"]);
+      await write(s, "notes.txt", "日常记录。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "日常更新"]);
+      await write(s, "treasure.txt", "藏宝图：X 标记宝藏的位置。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "重要成果：藏宝图"]);
+      // 模拟手滑事故
+      await git(s, ["reset", "--hard", "HEAD~1"]);
+    },
+  },
+  {
+    id: "19",
+    title: "第 19 关 · 看不见的文件：.gitignore",
+    subtitle: "忽略规则 / 停止跟踪",
+    story:
+      "仓库被塞得乱七八糟：调试日志、临时目录、密码配置文件全被 git status 盯上了，" +
+      "连构建产物都被误跟踪了。用 .gitignore 给仓库立规矩：什么该管，什么别管。",
+    steps: [
+      "git status — 看看当前有哪些「不速之客」（debug.log、temp/、secrets.env）",
+      'echo "*.log" > .gitignore — 创建忽略清单',
+      'echo "temp/" >> .gitignore 和 echo "*.env" >> .gitignore — 补上另外两条规则',
+      "git add .gitignore && git commit -m \"添加忽略规则\" — 规则本身也要提交",
+      "git rm --cached build/output.txt — 让误跟踪的构建产物脱离 Git（文件还在磁盘上）",
+      'echo "build/" >> .gitignore — 把 build/ 也写进忽略规则，不然它马上又回来了',
+      'git add .gitignore && git commit -m "停止跟踪构建产物" && git status — 现在清爽了',
+    ],
+    hints: [
+      "规则一行一条：*.log 忽略所有日志、temp/ 忽略目录、!keep.txt 感叹号表示例外。",
+      ".gitignore 只对「未跟踪」的文件生效——已经提交过的文件要先 git rm --cached 请出仓库。",
+      "--cached 的意思是「只从 Git 里删，磁盘上的文件留着」——构建产物需要留在本地。",
+    ],
+    goals: [
+      {
+        label: ".gitignore 已创建并提交",
+        check: async (s) => (await listTrackedFiles(s.dir)).includes(".gitignore"),
+      },
+      {
+        label: "垃圾文件不再被 Git 盯上（debug.log / temp / secrets.env 从 status 消失）",
+        check: async (s) => {
+          if (!(await listTrackedFiles(s.dir)).includes(".gitignore")) return false;
+          const paths = new Set((await gitStatus(s.dir)).map((f) => f.path));
+          return !paths.has("debug.log") && !paths.has("secrets.env") && !paths.has("temp") && ![...paths].some((p) => p.startsWith("temp/"));
+        },
+      },
+      {
+        label: "build/output.txt 已停止跟踪，但文件还留在磁盘上",
+        check: async (s) => {
+          if (!(await listTrackedFiles(s.dir)).includes(".gitignore")) return false;
+          const tracked = await listTrackedFiles(s.dir);
+          try {
+            await fs.stat(path.join(s.dir, "build", "output.txt"));
+            return !tracked.includes("build/output.txt");
+          } catch {
+            return false;
+          }
+        },
+      },
+      {
+        label: "收拾完毕：工作区干干净净",
+        check: cleanTree,
+      },
+    ],
+    setup: async (s) => {
+      await write(s, "app.txt", "小镇应用。\n");
+      await git(s, ["init"]);
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "初始版本"]);
+      // 误跟踪的构建产物
+      await write(s, "build/output.txt", "构建输出（每次都会变）。\n");
+      await git(s, ["add", "."]);
+      await git(s, ["commit", "-m", "添加构建产物（失误）"]);
+      // 未跟踪的垃圾
+      await write(s, "debug.log", "DEBUG 12:00 灵异事件\n");
+      await write(s, "temp/t1.txt", "临时文件。\n");
+      await write(s, "secrets.env", "PASSWORD=123456\n");
+    },
+  },
 ];
 
 /** 二期路线图（仅展示，未开放） */

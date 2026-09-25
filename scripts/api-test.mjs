@@ -183,5 +183,52 @@ r = await exec("git push --tags");
 check("L15 全流程演练 → 目标全过", allDone(r), JSON.stringify(r.output?.slice(0, 200)));
 check("L15 远程已有 v2.0 标签", r.state.goals[3].done === true);
 
-console.log(failed ? "\n❌❌ 存在失败项" : "\n🎉 全部 15 关 API 测试通过");
+// ---------- 第 16 关：cherry-pick ----------
+st = await enter("16");
+r = await exec("git rev-list --reverse feature");
+const featHashes = r.output.trim().split("\n"); // [第一章, 主线笔记, 重要修复, 实验乱改]
+r = await exec(`git switch main && git cherry-pick ${featHashes[2]}`);
+check("L16 摘樱桃 → 目标全过", allDone(r), JSON.stringify(r.output?.slice(0, 150)));
+
+// ---------- 第 17 关：bisect ----------
+st = await enter("17");
+r = await exec("git rev-list --reverse HEAD");
+const hs = r.output.trim().split("\n"); // 8 个提交，第 6 个（下标 5）引入 BUG
+await exec("git bisect start");
+await exec("git bisect bad HEAD");
+r = await exec(`git bisect good ${hs[0]}`);
+for (let i = 0; i < 12; i++) {
+  if (/is the first '?bad'? commit/.test(r.output ?? "")) break;
+  r = await exec("git rev-parse HEAD");
+  const cur = r.output.trim();
+  const idx = hs.indexOf(cur);
+  if (idx === -1) break;
+  r = await exec(`git bisect ${idx >= 5 ? "bad" : "good"}`);
+}
+check("L17 bisect 锁定真凶提交", /is the first '?bad'? commit/.test(r.output ?? ""), JSON.stringify(r.output?.slice(0, 140)));
+r = await exec("git bisect reset");
+for (let i = 1; i <= 8; i++) await exec(`echo 第${i}步计算完成。${i === 1 ? " >" : " >>"} calc.txt`);
+r = await exec('git add calc.txt && git commit -m "修复除零错误"');
+check("L17 修复并收工 → 目标全过", allDone(r), JSON.stringify(r.output?.slice(0, 150)));
+
+// ---------- 第 18 关：reflog ----------
+st = await enter("18");
+r = await exec("git reflog");
+r = await exec("git log -g --format=%H|%gs");
+const lostLine = (r.output ?? "").split("\n").find((l) => l.includes("重要成果"));
+const lostHash = lostLine?.split("|")[0];
+check("L18 reflog 里找到丢失提交", !!lostHash, `hash=${lostHash}`);
+r = await exec(`git reset --hard ${lostHash}`);
+check("L18 找回提交 → 目标全过", allDone(r));
+
+// ---------- 第 19 关：gitignore ----------
+st = await enter("19");
+r = await exec(
+  'echo "*.log" > .gitignore && echo "temp/" >> .gitignore && echo "*.env" >> .gitignore && git add .gitignore && git commit -m "添加忽略规则"'
+);
+check("L19 忽略规则生效（垃圾文件从 status 消失）", r.state.goals[0].done === true && r.state.goals[1].done === true, JSON.stringify(r.output?.slice(0, 100)));
+r = await exec('git rm --cached build/output.txt && echo "build/" >> .gitignore && git add .gitignore && git commit -m "停止跟踪构建产物"');
+check("L19 停止跟踪误跟踪文件 → 目标全过", allDone(r), JSON.stringify(r.output?.slice(0, 150)));
+
+console.log(failed ? "\n❌❌ 存在失败项" : "\n🎉 全部 19 关 API 测试通过");
 process.exit(failed ? 1 : 0);

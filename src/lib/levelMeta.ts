@@ -15,12 +15,16 @@ export const LEVEL_META = [
   { id: "13", title: "第 13 关 · 分支清理", short: "分支清理" },
   { id: "14", title: "第 14 关 · 被拒绝的 push", short: "push 被拒" },
   { id: "15", title: "第 15 关 · 综合大演练：v2.0 发布日", short: "综合演练" },
+  { id: "16", title: "第 16 关 · 摘樱桃：cherry-pick", short: "cherry-pick" },
+  { id: "17", title: "第 17 关 · 二分捉虫：bisect", short: "bisect" },
+  { id: "18", title: "第 18 关 · 时光邮差：reflog", short: "reflog" },
+  { id: "19", title: "第 19 关 · 看不见的文件：.gitignore", short: "gitignore" },
 ];
 
 /** 后续路线图（仅展示，未开放） */
 export const ROADMAP = [
-  { title: "第 16 关 · 摘樱桃", subtitle: "cherry-pick：精准摘取某次提交" },
-  { title: "第 17 关 · 二分捉虫", subtitle: "bisect：自动定位引入 bug 的提交" },
-  { title: "第 18 关 · 时光邮差", subtitle: "reflog：找回以为丢失的提交" },
-  { title: "第 19 关 · 分身术", subtitle: "worktree：多分支并行开发" },
+  { title: "第 20 关 · 分身术", subtitle: "worktree：多分支并行（需要多终端支持，开发中）" },
+  { title: "第 21 关 · 交互式变基", subtitle: "rebase -i：重排/合并/改写提交" },
+  { title: "第 22 关 · 仓库套娃", subtitle: "submodule：仓库里的仓库" },
+  { title: "第 23 关 · 团队实战模拟", subtitle: "模拟真实多人协作工作流" },
 ];
